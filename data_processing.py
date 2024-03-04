@@ -15,77 +15,63 @@ data_labels_xlsx = 'Data for geometry-based greenness index comparisons in lettu
 train_datagen = ImageDataGenerator(rescale=1./255, shear_range=0.2, zoom_range=0.2, horizontal_flip=True)
 val_datagen = ImageDataGenerator(rescale=1./255)
 
-# Use load_data function to load images (assuming regression for height prediction)
-train_images, train_actual_heights, _ = load_data(train_data_dir)
-val_images, val_actual_heights, _ = load_data(val_data_dir)
-
-# Preprocess images if needed (optional)
-# You can add your custom preprocessing steps here (e.g., normalization)
-
-# Convert lists to NumPy arrays for model training
-train_images = np.array(train_images)
-val_images = np.array(val_images)
-train_actual_heights = np.array(train_actual_heights)
-val_actual_heights = np.array(val_actual_heights)
-
-# ... rest of your model building and training code here
-
-import os
-import numpy as np
-from PIL import Image
-
 def load_data(data_dir):
-  """
-  Loads images and actual heights from a directory (assuming height in filenames or separate files).
+    """
+    Loads images and actual heights from a directory (assuming height in filenames or separate files).
 
-  Args:
-      data_dir: Path to the directory containing image files.
+    Args:
+        data_dir: Path to the directory containing image files.
 
-  Returns:
-      images: A list of preprocessed images (NumPy arrays).
-      actual_heights: A list of actual height labels (NumPy arrays).
-      desired_heights: A list of desired height labels (NumPy arrays, ignored in this case).
-  """
+    Returns:
+        images: A list of preprocessed images (NumPy arrays).
+        actual_heights: A list of actual height labels (NumPy arrays).
+        desired_heights: A placeholder list for desired heights (currently ignored).
+    """
 
-  images = []
-  actual_heights = []
-  desired_heights = []
+    images = []
+    actual_heights = []
+    desired_heights = []
 
-  for filename in os.listdir(data_dir):
-    # Extract image name and extension
-    name, ext = os.path.splitext(filename)
+    for filename in os.listdir(data_dir):
+        # Extract image name and extension
+        name, ext = os.path.splitext(filename)
 
-    # Skip non-image files
-    if ext not in [".jpg", ".png"]:
-      continue
+        # Skip non-image files
+        if ext not in [".jpg", ".png"]:
+            continue
 
-    # Load image and preprocess (placeholder, add your preprocessing if needed)
-    image = np.array(Image.open(os.path{}.join(data_dir, filename)))
+        # Load image (assuming RGB format)
+        image = np.array(Image.open(os.path.join(data_dir, filename)).convert('RGB'))
 
-    # Check for height information in filename (optional)
-    try:
-      actual_height = float(name.split('_')[-1].replace('cm', ''))  # Assuming format "lettuce_<height>cm.jpg"
-    except ValueError:
-      # If height not in filename, load from separate file (optional)
-      actual_height_path = os.path.join(data_dir, name + "_actual_height.txt")
-      try:
-        with open(actual_height_path, "r") as f:
-          actual_height = float(f.read())
-      except (IOError, ValueError) as e:
-        print(f"Error loading actual height for {filename}: {e}")
-        actual_height = np.nan  # Use a placeholder value (e.g., NaN) for missing data
+        # Check for height information in filename (optional)
+        try:
+            actual_height = float(name.split('_')[-1].replace('cm', ''))  # Assuming format "lettuce_<height>cm.jpg"
+        except ValueError:
+            # If height not in filename, load from separate file (optional)
+            actual_height_path = os.path.join(data_dir, name + "_actual_height.txt")
+            try:
+                with open(actual_height_path, "r") as f:
+                    actual_height = float(f.read())
+            except (IOError, ValueError) as e:
+                print(f"Error loading actual height for {filename}: {e}")
+                actual_height = np.nan  # Use a placeholder value (e.g., NaN) for missing data
 
-    # Desired heights are currently ignored (modify if needed)
-    desired_heights.append(np.nan)  # Placeholder, replace with desired height loading if applicable
+        # Desired heights are currently ignored (modify if needed)
+        desired_heights.append(np.nan)  # Placeholder, replace with desired height loading if applicable
 
-    images.append(image)
-    actual_heights.append(actual_height)
+        images.append(image)
+        actual_heights.append(actual_height)
 
-  return images, actual_heights, desired_heights
+    return images, actual_heights, desired_heights  # Return all three lists for potential future use
 
 # Load data labels from XLSX file
 try:
-  data_df = pd.read_excel(data_labels_xlsx)  # Read data from XLSX using pandas
-  # Assuming image filenames match entries in a specific column (modify as needed)
-  image_filenames = data_df['Image Filename'].tolist()  # Extract image filenames
-exce
+    data_df = pd.read_excel(data_labels_xlsx)  # Read data from XLSX using pandas
+    # Assuming image filenames match entries in a specific column (modify as needed)
+    image_filenames = data_df['Image Filename'].tolist()  # Extract image filenames
+except Exception as e:
+    print(f"Error loading data labels: {e}")
+    exit(1)  # Exit with an error code if data loading fails
+
+# Process for using the loaded data for training (replace with your model building and training code)
+# ... your model building and training code here ...
