@@ -1,94 +1,106 @@
 import cv2
 import numpy as np
+from datetime import datetime
 
+class LettuceTracker:
+    def __init__(self):
+        self.stable_frame_count = 0
+        self.stable_height = None
+        self.stable_bbox = None
+        self.unstable_frame_count = 0
 
-def estimate_camera_position(image, grid_size, fixed_distance=254):
-    """
-    Estimates the camera position using a calibration pattern image and a fixed distance.
+    def calculate_height(self, contour):
+        # Assuming the lettuce plant is relatively straight, use the bounding box height as an estimate
+        x, y, w, h = cv2.boundingRect(contour)
+        return h
 
-    Args:
-        image (np.ndarray): The image to analyze.
-        grid_size (int): The number of squares in the calibration grid.
-        fixed_distance (float, optional): The fixed distance between the camera and the object in millimeters. Defaults to 254.
+    def is_lettuce(self, contour):
+        # Adjust these parameters based on the characteristics of your lettuce plants
+        aspect_ratio_min = 0.5
+        aspect_ratio_max = 2.0
+        area_min = 500
 
-    Returns:
-        np.ndarray: The estimated camera position in millimeters, or None if estimation fails.
-    """
+        # Calculate aspect ratio
+        x, y, w, h = cv2.boundingRect(contour)
+        aspect_ratio = float(w) / h
 
-    # Load the calibration pattern image (replace with your actual path)
-    pattern_image = cv2.imread("calibration_pattern.png")
+        # Check aspect ratio and area to filter out non-lettuce contours
+        return aspect_ratio_min < aspect_ratio < aspect_ratio_max and cv2.contourArea(contour) > area_min
 
-    # Convert images to grayscale
-    gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray_pattern_image = cv2.cvtColor(pattern_image, cv2.COLOR_BGR2GRAY)
+    def update(self, frame, contours):
+        stable_detected = False
 
-    # Find chessboard corners in both images
-    ret1, corners1 = cv2.findChessboardCorners(gray_pattern_image, (grid_size, grid_size), None)
-    ret2, corners2 = cv2.findChessboardCorners(gray_image, (grid_size, grid_size), None)
+        for contour in contours:
+            if self.is_lettuce(contour):
+                height = self.calculate_height(contour)
 
-    # Check if corners are found in both images
-    if not ret1 or not ret2:
-        print("Error: Chessboard corners not found!")
-        return None
+                # Check if the current frame is consistent with the stable frame
+                if self.stable_frame_count > 0 and abs(height - self.stable_height) < 10:
+                    self.stable_frame_count += 1
+                    if self.stable_frame_count >= 5:  # Adjust stability threshold as needed
+                        stable_detected = True
+                        self.stable_bbox = cv2.boundingRect(contour)
+                        break
+                else:
+                    self.stable_height = height
+                    self.stable_frame_count = 1
 
-    # Calculate the object size based on the grid size and known square size (adjust accordingly)
-    object_size = (grid_size - 1) * 10  # Assuming each square is 10mm wide
+        if not stable_detected:
+            self.stable_frame_count = 0
 
-    # Calculate the focal length using the formula
-    # f = object_size * pixel_size / distance
-    # where pixel_size is the average distance between two corresponding corners in pixels
-    pixel_size = np.mean(np.linalg.norm(corners2 - corners1, axis=1))
-    focal_length = object_size * pixel_size / fixed_distance
+        return stable_detected
 
-    # Calculate the rotation vector and translation vector (simplified approach)
-    retval, rvecs, tvecs = cv2.solvePnP(corners1, corners2, np.array([[focal_length, 0, image.shape[1] / 2],
-                                                                 [0, focal_length, image.shape[0] / 2],
-                                                                 [0, 0, 1]]), None, None, None, cv2.SOLVE_PNP_ITERATIVE)
+    def draw_stable_bbox(self, frame):
+        if self.stable_bbox:
+            x, y, w, h = self.stable_bbox
+            cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(frame, f'Stable Height: {self.stable_height}', (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1)
 
-    # Extract the camera position (inverted for easier visualization)
-    camera_position = -tvecs[0]
+def process_frame(frame, tracker):
+    # Convert the frame to grayscale
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    return camera_position
+    # Apply GaussianBlur to reduce noise and improve contour detection
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
+    # Use Canny edge detection to find edges in the image
+    edges = cv2.Canny(blurred, 50, 150)
 
-# Example usage
-def capture_and_estimate_position(grid_size, fixed_distance=254):
-    """
-    Captures an image from the default camera and estimates the camera position.
+    # Find contours in the edged image
+    contours, _ = cv2.findContours(edges, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    Args:
-        grid_size (int): The number of squares in the calibration grid.
-        fixed_distance (float, optional): The fixed distance between the camera and the object in millimeters. Defaults to 254.
+    # Check for stability and update tracker
+    stable_detected = tracker.update(frame, contours)
 
-    Returns:
-        np.ndarray: The estimated camera position in millimeters, or None if capture or estimation fails.
-    """
+    # Draw bounding box only if lettuce is stable
+    if stable_detected:
+        tracker.draw_stable_bbox(frame)
 
-    cap = cv2.VideoCapture(0)
+    # Add timestamp to the frame
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    cv2.putText(frame, timestamp, (10, frame.shape[0] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
 
-    if not cap.isOpened():
-        print("Error: Failed to open camera!")
-        return None
+    return frame
 
+# Open the video capture (you may need to adjust the argument to your camera index or video file)
+cap = cv2.VideoCapture(0)
+
+lettuce_tracker = LettuceTracker()
+
+while True:
+    # Read a frame from the video capture
     ret, frame = cap.read()
 
-    cap.release()
+    # Process the frame
+    processed_frame = process_frame(frame, lettuce_tracker)
 
-    if not ret:
-        print("Error: Failed to capture frame!")
-        return None
+    # Display the processed frame
+    cv2.imshow('Lettuce Height Detection', processed_frame)
 
-    camera_position = estimate_camera_position(frame, grid_size, fixed_distance)
+    # Break the loop if 'q' is pressed
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
 
-    return camera_position
-
-
-if __name__ == "__main__":
-    grid_size = 7  # Number of squares in the calibration grid (adjust accordingly)
-
-    camera_position = capture_and_estimate_position(grid_size)
-
-    if camera_position is not None:
-        print("Estimated camera position:", camera_position)
-    else:
-        print("Failed to estimate camera position")
+# Release the video capture and close all OpenCV windows
+cap.release()
+cv2.destroyAllWindows()

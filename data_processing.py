@@ -1,14 +1,15 @@
 import tensorflow as tf
-from tensorflow.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
+from tensorflow.compat.v1.keras.layers import Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
 import pandas as pd
+import numpy as np
 from PIL import Image
 import os
 import random
 
 # Define paths to your data (modify as needed)
 base_data_dir = 'C:\Users\asus\Documents\GitHub\Thesis-Lettuce\thesis image processing\Data for geometry-based greenness index comparisons in lettuce biophysical estimations'  # Replace with actual path
-data_labels_xlsx = 'C:\Users\asus\Documents\GitHub\Thesis-Lettuce\thesis image processing\Data for geometry-based greenness index comparisons in lettuce biophysical estimations\CEA_Numerical_Data.xlsx'  # Replace with actual path
+data_labels_xlsx = 'C:/Users/asus/Documents/GitHub/Thesis-Lettuce/thesis image processing/Data for geometry-based greenness index comparisons in lettuce biophysical estimations/CEA_Numerical_Data.xlsx'  # Replace with actual path
 
 # Define training and validation ratios (adjust as needed)
 train_ratio = 0.8
@@ -103,3 +104,9 @@ val_datagen = ImageDataGenerator(rescale=1./255)
 
 # Use train_datagen and val_datagen in your model training process (replace with your code)
 # ... your model building and training code using train_datagen and val_datagen ...
+
+# Access and process the Excel data (assuming you want to do this after processing images)
+excel_data = pd.read_excel(os.path.join(base_data_dir, "CEA_Numerical_Data.xlsx"))
+
+# Example usage: Print the first 5 rows of the Excel data
+print(excel_data.head())
